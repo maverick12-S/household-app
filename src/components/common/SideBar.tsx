@@ -1,11 +1,12 @@
-import { Box, Divider, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar } from '@mui/material';
+import { Box, Collapse, Divider, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Toolbar } from '@mui/material';
 import React, { CSSProperties } from 'react';
-import MailIcon from '@mui/icons-material/Mail';
-import InboxIcon from '@mui/icons-material/MoveToInbox';
 import HomeIcon from '@mui/icons-material/Home';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import { NavLink } from 'react-router-dom';
-import { red } from '@mui/material/colors';
+import SettingsIcon from '@mui/icons-material/Settings';
+import LogoutIcon from '@mui/icons-material/Logout';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+import { accountManagement,logout } from '../../auth/keycloak';
 
 interface SideBarProps  {
   drawerWidth: number;
@@ -37,13 +38,22 @@ const SideBar = ({
   handleDrawerClose,
   handleDrawerTransitionEnd
 }: SideBarProps) => {
+    const [optionOpenMenu, setOptionOpenMenu] = React.useState(false);
+
     const MenuItems: menuItem[] = [
         {text: "HOME", path: "/", icon: HomeIcon},
         {text: "Report", path: "/report", icon: BarChartIcon}
-    ]
+    ] 
+    const handleOptionToggle = () => {
+        setOptionOpenMenu(prev => !prev);
+      }
+      const handleLogout = () => {
+        logout();
+      }
 
     const drawer = (
-        <div>
+        <Box display="flex" flexDirection="column" height="100%">
+          <Box flex="1 1 auto">
           <Toolbar />
           <Divider />
           <List>
@@ -57,9 +67,6 @@ const SideBar = ({
               <ListItem key={index} disablePadding>
                 <ListItemButton>
                   <ListItemIcon>
-                    {/* {index % 2 === 0 ? <InboxIcon
-                     /> : <MailIcon />} */}
-
                      <item.icon />
                   </ListItemIcon>
                   <ListItemText primary={item.text} />
@@ -67,11 +74,45 @@ const SideBar = ({
               </ListItem>
               </NavLink>
             ))}
-
           </List>
+            </Box>
+            <Box>
+            <List>
+              <Collapse in={optionOpenMenu} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding sx={{ pl:4 }}>
+                  <ListItemButton onClick={handleLogout}>
+                    <ListItemIcon>
+                    <LogoutIcon />
+                    </ListItemIcon>
+                    <ListItemText primary="ログアウト"/>
+                  </ListItemButton>
+
+                  <ListItemButton onClick={accountManagement}>
+                    <ListItemIcon>
+                    <AccountCircleIcon />
+                    </ListItemIcon>
+                    <ListItemText primary="アカウント管理"/>
+                  </ListItemButton>
+                </List>
+              </Collapse>
+              <ListItem disablePadding>
+                <ListItemButton onClick={handleOptionToggle}>
+                  <ListItemIcon>
+                    <SettingsIcon/>
+                  </ListItemIcon>
+                  <ListItemText primary="オプション"/>
+                  </ListItemButton>
+              </ListItem>
+          </List>
+        </Box>
+        </Box>
           
-        </div>
       );
+      
+      // const handlePasswordChange = () => {
+      //   window.location.href = `${keycloak.createAccountUrl({ action: 'UPDATE_PASSWORD'})}`;
+      // }
+      
   return (
     <Box
       component="nav"
@@ -104,6 +145,8 @@ const SideBar = ({
       >
         {drawer}
       </Drawer>
+
+      
     </Box>
   );
 };

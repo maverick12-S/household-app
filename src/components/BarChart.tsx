@@ -12,7 +12,6 @@ import {
   ChartData,
 } from 'chart.js';
 import { Bar } from 'react-chartjs-2';
-import { Transaction } from '../types';
 import { calculateDailyBalance } from '../utils/financeCalculations';
 import { theme } from '../theme/theme';
 import { Box, CircularProgress, Typography, useTheme } from '@mui/material';

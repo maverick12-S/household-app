@@ -1,11 +1,10 @@
 import { Grid, Paper } from '@mui/material'
-import React from 'react'
 import MonthSelector from '../components/MonthSelector'
 import CategoryChart from '../components/CategoryChart'
 
 import TransactionTable from '../components/TransactionTable'
 import BarChart from '../components/BarChart'
-import { Transaction } from '../types'
+
 
 const Report = () => {
   const commonPaperStyle = {

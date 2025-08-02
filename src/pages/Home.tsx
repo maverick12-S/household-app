@@ -1,5 +1,5 @@
-import { Box, useMediaQuery, useTheme } from '@mui/material'
-import React, { useMemo, useState } from 'react'
+import { Box, useTheme } from '@mui/material'
+import React, { useState } from 'react'
 import MonthlySummary from '../components/MonthlySummary'
 import Calendar from '../components/Calendar'
 import TransactionMenu from '../components/TransactionMenu'

@@ -1,115 +1,159 @@
-
-import { createContext, ReactNode, useContext, useState } from "react";
-import { Transaction } from "../types";
+import {
+  createContext,
+  ReactNode,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
 import { useMediaQuery, useTheme } from "@mui/material";
-import { addDoc, collection, deleteDoc, doc, updateDoc } from "firebase/firestore";
+import {
+  accountManagement,
+  getToken,
+  login,
+  logout,
+} from "../auth/keycloak";
+import {
+  deleteTransactionOnServer,
+  postTransactionToServer,
+  updateTransactionOnServer,
+} from "../api/transactionApi";
+import { Transaction } from "../types";
 import { Schema } from "../validations/schema";
-import { db } from "../firebase";
-import { isFireStoreError } from "../utils/errorHandling";
+import { ErrorSnackbar } from "../components/common/ErrorSnackbar";
+import { AuthContext } from "./AuthContext";
 
 interface AppContextType {
-    transactions: Transaction[];
-    setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
-    currentMonth: Date;
-    setCurrentMonth: React.Dispatch<React.SetStateAction<Date>>;
-    isLoading: boolean;
-    setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
-    isMobile: boolean;
-    onSaveTransaction: (transaction: Schema) => Promise<void>;
-    onDeleteTransaction: (transactionId: string | readonly string[]) => Promise<void>;
-    onUpdateTransaction: (transaction: Schema, transactionId: string) => Promise<void>;
+  transactions: Transaction[];
+  setTransactions: React.Dispatch<React.SetStateAction<Transaction[]>>;
+  currentMonth: Date;
+  setCurrentMonth: React.Dispatch<React.SetStateAction<Date>>;
+  isLoading: boolean;
+  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  isMobile: boolean;
+  onSaveTransaction: (transaction: Schema) => Promise<void>;
+  onDeleteTransaction: (
+    transactionId: string | readonly string[]
+  ) => Promise<void>;
+  onUpdateTransaction: (
+    transaction: Schema,
+    transactionId: string
+  ) => Promise<void>;
+  isAuthenticated: boolean | undefined;
+  userInfo: unknown;
+  login: () => void;
+  logout: () => void;
+  accountManagement: () => void;
+  accessToken: string | undefined;
+  errorMessage: string;
+  setError: (message: string) => void;
+  clearError: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+export const AppContextProvider = ({ children }: { children: ReactNode }) => {
+  const authContext = useContext(AuthContext);
+  const accessToken = authContext?.accessToken;
+  const isAuthenticated = authContext?.isAuthenticated;
+  const userInfo = authContext?.userInfo;
 
-export const AppContextProvider = ({children}: {children:ReactNode}) => {
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
-    const [currentMonth, setCurrentMonth] = useState(new Date());
-    const [isLoading, setIsLoading] = useState(true);
-    const theme = useTheme();
-    const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
-      const onSaveTransaction = async(transaction: Schema) => {
-        try{
-          const  docRef = await addDoc(collection(db, "Transactions"), transaction);
-          const newTransaction ={
-            id : docRef.id,
-            ...transaction
-          } as Transaction;
-          setTransactions((prevTransaction) => [...prevTransaction, newTransaction]);
-        } catch(error) {
-            if (isFireStoreError(error)) {
-              console.error('🔥 Firestoreエラー:', error.message);
-            } else {
-              console.error('🛑 一般的なエラー:', error);
-            }
-          }
-        
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("lg"));
+
+  const setError = (message: string) => setErrorMessage(message);
+  const clearError = () => setErrorMessage("");
+
+  const onSaveTransaction = async (transaction: Schema) => {
+    try {
+      const token = accessToken;
+      const savedTransaction = await postTransactionToServer(transaction, token);
+      if (savedTransaction && "id" in savedTransaction) {
+        setTransactions((prev) => [...prev, savedTransaction as Transaction]);
       }
-      
-      const onDeleteTransaction = async(transactionIds: string | readonly string[]) => {
-        try{
-          const idsToDelete = Array.isArray(transactionIds) ? transactionIds : [transactionIds];
-          console.log('削除するID:', idsToDelete);
-          for(const id of idsToDelete) {
-            await deleteDoc(doc(db,"Transactions",id));
-          }
-          const filterdTransactions = transactions.filter(
-                (transaction) => !idsToDelete.includes(transaction.id));
-            setTransactions(filterdTransactions);
-             }catch(error) {
-            if (isFireStoreError(error)) {
-              console.error('🔥 Firestoreエラー:', error.message);
-            } else {
-              console.error('🛑 一般的なエラー:', error);
-            }
-          }
+    } catch (error: any) {
+      setError(error.message);
+    }
+  };
+
+  const onDeleteTransaction = async (
+    transactionIds: string | readonly string[]
+  ) => {
+    try {
+      const token = accessToken;
+      const idsToDelete = Array.isArray(transactionIds)
+        ? transactionIds
+        : [transactionIds];
+      const success = await deleteTransactionOnServer(idsToDelete, token);
+      if (success) {
+        setTransactions((prev) =>
+          prev.filter((t) => !idsToDelete.includes(t.id))
+        );
       }
-    
-      const onUpdateTransaction = async(transaction: Schema, transactionId: string) => {
-        try{
-          const docRef = doc(db, "Transactions" , transactionId);
-          await updateDoc(docRef,transaction);
-    
-          const updatedTransactions = transactions.map((t) =>
-            t.id === transactionId ? {...t, ...transaction} : t);
-          setTransactions(updatedTransactions);
-    
-        }catch(error){
-          if (isFireStoreError(error)) {
-              console.error('🔥 Firestoreエラー:', error.message);
-            } else {
-              console.error('🛑 一般的なエラー:', error);
-            }
-        }
+    } catch (error: any) {
+      setError(error.message);
+    }
+  };
+
+  const onUpdateTransaction = async (
+    transaction: Schema,
+    transactionId: string
+  ) => {
+    try {
+      const token = accessToken;
+      const updated = await updateTransactionOnServer(
+        transaction,
+        transactionId,
+        token
+      );
+      if (updated) {
+        setTransactions((prev) =>
+          prev.map((t) => (t.id === transactionId ? { ...t, ...updated } : t))
+        );
       }
+    } catch (error: any) {
+      setError(error.message);
+    }
+  };
 
-
-    return (
-        <AppContext.Provider 
-        value={{
-            transactions
-            ,setTransactions
-            ,currentMonth
-            ,setCurrentMonth
-            ,isLoading
-            ,setIsLoading,
-            isMobile,
-            onSaveTransaction,
-            onDeleteTransaction,
-            onUpdateTransaction,
-            }}>
-
-            {children}
-        </AppContext.Provider>
-    )
-}
+  return (
+    <AppContext.Provider
+      value={{
+        transactions,
+        setTransactions,
+        currentMonth,
+        setCurrentMonth,
+        isLoading,
+        setIsLoading,
+        isMobile,
+        onSaveTransaction,
+        onDeleteTransaction,
+        onUpdateTransaction,
+        isAuthenticated,
+        userInfo,
+        login,
+        logout,
+        accountManagement,
+        accessToken,
+        errorMessage,
+        setError,
+        clearError,
+      }}
+    >
+      <ErrorSnackbar open={!!errorMessage} message={errorMessage} onClose={clearError} />
+      {children}
+    </AppContext.Provider>
+  );
+};
 
 export const useAppContext = () => {
-    const context = useContext(AppContext);
-    if(!context){
-        throw new Error("useAppContext must be used within an AppContextProvider");
-    }
-    return context;
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error("useAppContext must be used within an AppContextProvider");
+  }
+  return context;
 };

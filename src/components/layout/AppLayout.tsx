@@ -2,14 +2,8 @@ import * as React from 'react';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import CssBaseline from '@mui/material/CssBaseline';
-import Divider from '@mui/material/Divider';
-import IconButton from '@mui/material/IconButton';
 
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemButton from '@mui/material/ListItemButton';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
+import IconButton from '@mui/material/IconButton';
 
 import MenuIcon from '@mui/icons-material/Menu';
 import Toolbar from '@mui/material/Toolbar';
@@ -17,55 +11,41 @@ import Typography from '@mui/material/Typography';
 import { Outlet } from 'react-router-dom';
 import SideBar from '../common/SideBar';
 import { useAppContext } from '../../context/AppContext';
-import { collection, getDocs } from 'firebase/firestore';
-import { Transaction } from '../../types';
-import { db } from '../../firebase';
-import { isFireStoreError } from '../../utils/errorHandling';
+import { fetchTransactionFormServer} from '../../api/transactionApi';
+
+import { getUserEmail } from '../../auth/keycloak';
+import { registerEmailNotification } from '../../api/notifications';
+
 
 const drawerWidth = 240;
 
 export default function AppLayout() {
   
-  const {setTransactions,setIsLoading} = useAppContext();
+  const {setTransactions,setIsLoading,accessToken,setError} = useAppContext();
 
 
     React.useEffect(() => {
+      const token = accessToken;
+      const email = getUserEmail();
       const fetchTransactions = async () => {
         try {
-          const querySnapshot = await getDocs(collection(db, 'Transactions'));
-          console.log('取得件数:', querySnapshot.size);
-  
-          if (querySnapshot.empty) {
-            console.warn('⚠ Firestoreにデータは存在しますが、クエリ結果は0件です。');
-          }
-  
-          querySnapshot.forEach((doc) => {
-            console.log('📄 ドキュメントID:', doc.id);
-            console.log('📦 データ内容:', doc.data());
-          });
-  
-          const transactionsData = querySnapshot.docs.map((doc) => {
-            const data = doc.data();
-            return {
-              ...data,
-              id: doc.id,
-            } as Transaction;
-          });
-  
-          setTransactions(transactionsData);
-        } catch (error) {
-          if (isFireStoreError(error)) {
-            console.error('🔥 Firestoreエラー:', error.message);
-          } else {
-            console.error('🛑 一般的なエラー:', error);
-          }
-        } finally {
+          const transactionsData = await fetchTransactionFormServer(token);
+
+          const transactionsWithId = transactionsData.map((t: any, idx: number) => ({
+            id: t.id ?? `${t.date}-${t.type}-${t.amount}-${idx}`,
+            ...t,
+          }));
+          setTransactions(transactionsWithId);
+          registerEmailNotification(token,email);
+        } catch (error : any) {
+          setError(error.message);
+        }finally{
           setIsLoading(false);
         }
-      };
-  
+      }
+      
       fetchTransactions();
-    }, []);
+    }, [accessToken]);
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [isClosing, setIsClosing] = React.useState(false);
@@ -108,7 +88,7 @@ export default function AppLayout() {
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div">
-            Responsive drawer
+            家計簿アプリ
           </Typography>
         </Toolbar>
       </AppBar>
